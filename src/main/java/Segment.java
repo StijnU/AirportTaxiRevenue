@@ -7,8 +7,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import static org.apache.lucene.util.SloppyMath.haversinMeters;
-
 /**
  * Segment class to easily store/create instances of Segments
  * Implements the Writable interface, so it can be used by Hadoop for Map/Reduce operations
@@ -190,7 +188,7 @@ public class Segment implements Writable{
      * @return Double distance
      */
     public double getDistance(){
-        return haversinMeters(this.startLat, this.startLong, this.endLat, this.endLong)/1000;
+        return flatSurfaceDistanceInKilometers(this.startLat, this.startLong, this.endLat, this.endLong);
     }
 
     /**
