@@ -1,0 +1,2 @@
+hadoop fs -rmdir /user/r0699490/data/out1/rev_calc_trips
+hadoop jar Bdap_project2-1.0-SNAPSHOT.jar RevenueCalculation /data/2010_03.segments data/out1/rev_calc_trips data/out1/total_rev data/out1/rev_over_time
