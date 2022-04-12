@@ -337,6 +337,7 @@ public class RevenueCalculation {
         job.setJarByClass(RevenueCalculation.class);
 
         ChainMapper.addMapper(job, TripFilterRevenueOverTime.class, LongWritable.class, Text.class, Text.class, DoubleWritable.class, new Configuration(false));
+        job.setNumReduceTasks(10);
 
         FileInputFormat.addInputPath(job, input);
         FileOutputFormat.setOutputPath(job, output);
@@ -361,6 +362,8 @@ public class RevenueCalculation {
 
         ChainMapper.addMapper(job, TripFilter.class, LongWritable.class, Text.class, NullWritable.class, Segment.class, new Configuration(false));
         ChainReducer.setReducer(job, RevenueCalculationReducer.class, NullWritable.class, Segment.class, NullWritable.class, DoubleWritable.class, new Configuration(false));
+
+        job.setNumReduceTasks(10);
 
         FileInputFormat.addInputPath(job, input);
         FileOutputFormat.setOutputPath(job, output);
