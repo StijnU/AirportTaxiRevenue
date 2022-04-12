@@ -37,6 +37,11 @@ public class Segment implements Writable{
     public Segment() {
     }
 
+    private static double flatSurfaceDistanceInKilometers(double startLat, double startLong, double endLat, double endLong) {
+        double coordToRad = Math.PI/180;
+        return 6371.009 * Math.sqrt(Math.pow((startLat - endLat) * coordToRad, 2) + Math.pow(Math.cos((startLat + endLat) * coordToRad / 2) * (startLong - endLong) * coordToRad, 2));
+    }
+
     /**
      * Creates a segment with the fields given as a String
      * @param ln String of segment fields
@@ -175,7 +180,7 @@ public class Segment implements Writable{
         // calculates the haversine distance on sphere for given angle coordinates
         // Returns the Haversine distance in meters between two points specified in decimal degrees (latitude/longitude). This works correctly even if the dateline is between the two points.
         //Error is at most 4E-1 (40cm) from the actual haversine distance, but is typically much smaller for reasonable distances: around 1E-5 (0.01mm) for distances less than 1000km.
-        double dist = haversinMeters(this.startLat, this.startLong, this.endLat, this.endLong)/1000;
+        double dist = flatSurfaceDistanceInKilometers(this.startLat, this.startLong, this.endLat, this.endLong);
         return dist/this.timeInHours;
     }
 

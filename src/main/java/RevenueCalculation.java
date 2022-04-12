@@ -49,6 +49,7 @@ public class RevenueCalculation {
         }
     }
 
+
     /**
      * The TripReconstructionMapper is an extension on the Hadoop Mapper Class.
      * It maps the input segments as Text to a Key-Value pair with IntWritable as Key and Segment as value
