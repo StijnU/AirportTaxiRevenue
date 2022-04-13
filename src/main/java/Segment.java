@@ -32,6 +32,8 @@ public class Segment implements Writable{
     private boolean closeToAirport;
     private Date startDate;
 
+    private double distance;
+
     public Segment() {
     }
 
@@ -56,6 +58,7 @@ public class Segment implements Writable{
         this.tooFast = Boolean.parseBoolean(lns[7]);
         this.closeToAirport = Boolean.parseBoolean(lns[8]);
         this.startDate = sdf.parse(lns[9]);
+        this.distance = calcDistance();
 
     }
 
@@ -75,6 +78,7 @@ public class Segment implements Writable{
 
         this.closeToAirport = this.isCloseTo(airportLong, airportLat);
         this.tooFast = this.getSpeed() > this.maxSpeed;
+        this.distance = calcDistance();
     }
 
     /**
@@ -99,11 +103,12 @@ public class Segment implements Writable{
         this.startLong = startLon;
         this.endLat = endLat;
         this.endLong = endLong;
-        this.full = ('M' == status);
+        this.full = ('E' != status);
         this.startDate = startDate;
 
         this.closeToAirport = this.isCloseTo(airportLong, airportLat);
         this.tooFast = this.getSpeed() > 200;
+        this.distance = calcDistance();
 
     }
 
@@ -123,6 +128,7 @@ public class Segment implements Writable{
         out.writeBoolean(this.tooFast);
         out.writeBoolean(this.closeToAirport);
         out.writeUTF(sdf.format(this.startDate.getTime()));
+        out.writeDouble(this.distance);
     }
 
     /**
@@ -142,9 +148,10 @@ public class Segment implements Writable{
         this.closeToAirport = in.readBoolean();
         try {
             this.startDate = sdf.parse(in.readLine().substring(2));
-
+            this.distance = in.readDouble();
         }
         catch(Exception ignored){}
+
     }
 
     /**
@@ -183,11 +190,20 @@ public class Segment implements Writable{
     }
 
     /**
-     * Cacluates the haversine distance between the start and end coordinates
+     * Returns the value of the distance of this segment
      *
      * @return Double distance
      */
-    public double getDistance(){
+    public double getDistance() {
+        return this.distance;
+    }
+
+    /**
+     * Cacluates the simple flat surface distance between the start and end coordinates
+     *
+     * @return Double distance
+     */
+    public double calcDistance(){
         return flatSurfaceDistanceInKilometers(this.startLat, this.startLong, this.endLat, this.endLong);
     }
 
@@ -199,6 +215,7 @@ public class Segment implements Writable{
      * Combination is possible when:
      *      - the start coordinates of 'this' are the same as end coordinates of the input segment
      *      - the end coordinates of 'this' are the same as start coordinates of the input segment
+     *      - and in both cases the segments have the same status
      *
      * When combined timeInHours is added up, start or end is changed to start or end of the input segment
      * An AND operation is taken from both tooFast values (if 1 segment is too fast, the whole trip should be invalid)
@@ -215,6 +232,7 @@ public class Segment implements Writable{
                 this.endLong = segment.getEndLong();
                 this.tooFast = this.tooFast && segment.isTooFast();
                 this.closeToAirport = this.closeToAirport || segment.isCloseToAirport();
+                this.distance += segment.getDistance();
                 return true;
             }
             else {
@@ -225,6 +243,7 @@ public class Segment implements Writable{
                     this.tooFast = this.tooFast && segment.isTooFast();
                     this.closeToAirport = this.closeToAirport || segment.isCloseToAirport();
                     this.startDate = segment.getStartDate();
+                    this.distance += segment.getDistance();
                     return true;
                 }
             }

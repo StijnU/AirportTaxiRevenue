@@ -31,6 +31,8 @@ public class RevenueCalculation {
     /**
      * The DirDeleter is a helper class that implements 1 function to delete the output directories
      * so hadoop does not throw a FileAlreadyExistsException.
+     *
+     * NOTE: This only works if the code is run locally
      */
     public static class DirDeleter {
 
@@ -80,9 +82,9 @@ public class RevenueCalculation {
                 double startLat = Double.parseDouble(vals[2]);
                 double startLong = Double.parseDouble(vals[3]);
                 Date endDate = sdf.parse(vals[5].replace("'", ""));
-                char status = vals[4].charAt(1);
                 double endLat = Double.parseDouble(vals[6]);
                 double endLong = Double.parseDouble(vals[7]);
+                char status = vals[8].charAt(1);
 
                 Segment segment = new Segment(taxiId, startDate, endDate, startLat, startLong, endLat, endLong, status);
                 context.write(new IntWritable(taxiId), segment);
@@ -118,12 +120,11 @@ public class RevenueCalculation {
          * @param context the hadoop reducer context
          */
         public void reduce(IntWritable key, Iterable<Segment> values, Context context) throws IOException, InterruptedException {
-            findTrips(values);
-            for (Segment trip : this.fullTrips){
-                context.write(NullWritable.get(), trip);
-            }
-            for (Segment trip : this.emptyTrips){
-                context.write(NullWritable.get(), trip);
+            ArrayList<Segment> trips = findTrips(values);
+            for (Segment trip : trips){
+                if (trip.isFull()) {
+                    context.write(NullWritable.get(), trip);
+                }
             }
         }
 
@@ -138,35 +139,13 @@ public class RevenueCalculation {
          * @param segments iterable of segments
          */
 
-        public void findTrips(Iterable<Segment> segments){
-            // split empty and full segments, otherwise all segments are 1 big trip
-            // also better performance, because less searching
-            Deque<Segment> fullSegments = getSegmentsByStatus(true, segments);
-            Deque<Segment> emptySegments = getSegmentsByStatus(false, segments);
-
-            this.fullTrips = combineSegments(fullSegments);
-            this.emptyTrips = combineSegments(emptySegments);
-        }
-
-        /**
-         * Helper function for findTrips
-         *
-         * This function takes a boolean and an iterable of segments, and returns all segments which are full/empty depending on the boolean
-         *
-         * A deque is created, and filled with empty/full segments depending on the filled variable
-         *
-         * @param filled boolean if True, function returns full segments otherwise function returns empty segments
-         * @param segments Iterable of segments
-         * @return Deque of the full/empty segments
-         */
-        public Deque<Segment> getSegmentsByStatus(boolean filled, Iterable<Segment> segments){
-            Deque<Segment> res = new ArrayDeque<>();
+        public ArrayList<Segment> findTrips(Iterable<Segment> segments){
+            // Wanted to make a deque out of the iterable, this may be an inefficient way to do this
+            Deque<Segment> segmentsDeque = new ArrayDeque<>();
             for (Segment segment : segments){
-                if (segment.isFull() == filled){
-                    res.add(new Segment(segment));
-                }
+                segmentsDeque.add(new Segment(segment));
             }
-            return res;
+            return combineSegments(segmentsDeque);
         }
 
         /**
@@ -222,10 +201,10 @@ public class RevenueCalculation {
          * @param ln Text line output of the first Map/Reduce
          * @param context The hadoop mapper context
          */
-        public void map(LongWritable key, Text ln, Context context) throws IOException, InterruptedException {
+        public void map(LongWritable key, Text ln, Context context){
             try {
                 Segment segment = new Segment(ln.toString());
-                if (!segment.isTooFast() && segment.isCloseToAirport() && segment.getDistance() > 0) {
+                if (!segment.isTooFast() && segment.isCloseToAirport() && segment.isFull()) {
                     context.write(NullWritable.get(), segment);
                 }
             }
@@ -254,10 +233,10 @@ public class RevenueCalculation {
          * @param ln Text line output of the first Map/Reduce
          * @param context The hadoop mapper context
          */
-        public void map(LongWritable key, Text ln, Context context) throws IOException, InterruptedException {
+        public void map(LongWritable key, Text ln, Context context){
             try {
                 Segment segment = new Segment(ln.toString());
-                if (!segment.isTooFast() && segment.isCloseToAirport() && segment.getDistance() > 0) {
+                if (!segment.isTooFast() && segment.isCloseToAirport() && segment.getDistance() > 0 && segment.isFull()) {
                     context.write(new Text(sdf.format(segment.getStartDate().getTime())), new DoubleWritable(segment.getDistance() * 1.79 + 3.25));
                 }
             }
@@ -314,7 +293,7 @@ public class RevenueCalculation {
 
         ChainMapper.addMapper(job, TripReconstructionMapper.class, LongWritable.class, Text.class, IntWritable.class, Segment.class, new Configuration(false));
         ChainReducer.setReducer(job, TripReconstructionReducer.class, IntWritable.class, Segment.class, NullWritable.class, Segment.class, new Configuration(false));
-
+        job.setNumReduceTasks(10);
         FileInputFormat.addInputPath(job, input);
         FileOutputFormat.setOutputPath(job, output);
         DirDeleter.deleteDirectory(new File(output.toString()));
@@ -383,14 +362,13 @@ public class RevenueCalculation {
         }
         System.out.println("Trips Reconstructed");
 
-
-        Job revenueCalcJob = revenueCalcJob(new Path(args[1] + "/part-r-00000"), new Path(args[2]));
+        Job revenueCalcJob = revenueCalcJob(new Path(args[1]), new Path(args[2]));
         if (!revenueCalcJob.waitForCompletion(true)) {
             System.exit(1);
         }
         System.out.println("Total Revenue Calculated");
 
-        Job revenueCalcOverTimeJob = revenueCalcOverTimeJob(new Path(args[1] + "/part-r-00000"), new Path(args[3]));
+        Job revenueCalcOverTimeJob = revenueCalcOverTimeJob(new Path(args[1]), new Path(args[3]));
         if (!revenueCalcOverTimeJob.waitForCompletion(true)) {
             System.exit(1);
         }
